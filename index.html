@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     <title>Mach3 屏幕分析助手 | PWA</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e1e">
@@ -16,10 +16,36 @@
             color: #e0e0e0;
             height: 100vh;
             overflow: hidden;
+            position: relative;
         }
-        .app { display: flex; height: 100vh; width: 100%; position: relative; }
-
-        /* 侧边栏 */
+        .menu-toggle {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1100;
+            background: #ffaa66;
+            border: none;
+            color: #000;
+            font-size: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
         .sidebar {
             width: 260px;
             background: #252525;
@@ -31,8 +57,25 @@
             overflow-y: auto;
             flex-shrink: 0;
             position: relative;
+            transition: transform 0.2s ease;
+            z-index: 1000;
         }
-        /* 拖拽把手 */
+        @media (max-width: 768px) {
+            .menu-toggle { display: flex; }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100%;
+                width: 260px;
+                transform: translateX(-100%);
+                box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+                z-index: 1001;
+            }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.active { display: block; }
+            .main { margin-left: 0 !important; }
+        }
         .resize-handle {
             position: absolute;
             right: -4px;
@@ -44,17 +87,22 @@
             z-index: 10;
         }
         .resize-handle:hover { background: rgba(255, 170, 102, 0.3); }
-
-        /* 右侧主区 */
-        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        @media (max-width: 768px) { .resize-handle { display: none; } }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
         .toolbar {
             background: #2a2a2a;
-            padding: 4px 12px;
+            padding: 6px 12px;
             display: flex;
             gap: 8px;
             align-items: center;
             border-bottom: 1px solid #444;
             flex-shrink: 0;
+            flex-wrap: wrap;
         }
         .zoom-btn, .mag-btn {
             background: #3a3a3a;
@@ -62,17 +110,17 @@
             color: white;
             font-size: 16px;
             font-weight: bold;
-            width: 28px;
-            height: 28px;
-            border-radius: 4px;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             justify-content: center;
         }
-        .mag-btn { width: auto; padding: 0 10px; font-size: 12px; font-weight: normal; gap: 4px; }
+        .mag-btn { width: auto; padding: 0 12px; font-size: 14px; font-weight: normal; gap: 4px; }
         .zoom-btn:hover, .mag-btn:hover { background: #ffaa66; color: #000; }
-        .zoom-reset { background: #555; font-size: 12px; width: auto; padding: 0 10px; }
+        .zoom-reset { background: #555; font-size: 12px; width: auto; padding: 0 12px; }
         .zoom-level { font-size: 12px; margin-left: 8px; color: #ffaa66; }
         .status {
             background: #333;
@@ -90,6 +138,7 @@
             justify-content: center;
             align-items: center;
             position: relative;
+            -webkit-overflow-scrolling: touch;
         }
         .page-canvas {
             position: relative;
@@ -101,7 +150,9 @@
             transform-origin: center center;
             transition: transform 0.1s ease;
         }
-        /* 放大镜浮层 */
+        @media (max-width: 768px) {
+            .page-canvas { transform: scale(0.45); transform-origin: top left; }
+        }
         .magnifier-tooltip {
             position: fixed;
             background: #1e1e1e;
@@ -113,7 +164,7 @@
             pointer-events: none;
             font-family: monospace;
             font-size: 14px;
-            max-width: 400px;
+            max-width: 300px;
             backdrop-filter: blur(4px);
             background-color: rgba(30,30,30,0.95);
             color: #ffaa66;
@@ -121,8 +172,6 @@
             word-break: break-word;
         }
         .magnifier-tooltip strong { color: #fff; }
-
-        /* 侧边栏内部样式 */
         .upload-area {
             border: 1px dashed #ffaa66;
             border-radius: 6px;
@@ -155,7 +204,6 @@
             align-items: center;
             cursor: pointer;
         }
-        .history-item:hover { background: #3a3a3a; }
         .history-item-info { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .delete-history {
             background: none;
@@ -166,7 +214,6 @@
             padding: 0 4px;
             margin-left: 6px;
         }
-        .delete-history:hover { color: red; }
         .tabs-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
         .tab-btn {
             text-align: left;
@@ -190,6 +237,7 @@
             text-align: center;
         }
         .filter-btn.reset { background: #888; }
+        .filter-btn.close-filter { background: #aa6e3a; }
         .ctrl-card {
             position: absolute;
             background: #3a6ea5;
@@ -217,16 +265,16 @@
         }
         .modal-content {
             background: #2a2a2a;
-            width: 550px;
-            max-width: 85%;
+            width: 90%;
+            max-width: 550px;
             border-radius: 8px;
             padding: 20px;
             border-left: 5px solid #ffaa66;
         }
-        .modal-header { font-size: 20px; margin-bottom: 10px; color: #ffaa66; }
+        .modal-header { font-size: 18px; margin-bottom: 10px; color: #ffaa66; }
         .modal-body {
             font-family: monospace;
-            font-size: 13px;
+            font-size: 12px;
             white-space: pre-wrap;
             background: #1e1e1e;
             padding: 10px;
@@ -243,7 +291,9 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<div class="app">
+<button class="menu-toggle" id="menuToggle">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="app" style="display: flex; height: 100%;">
     <div class="sidebar" id="sidebar">
         <div class="upload-area" id="uploadArea">📂 点击或拖拽 CSV 文件</div>
         <button id="clearAllHistoryBtn" class="clear-all-btn">🗑️ 清除全部历史</button>
@@ -258,6 +308,7 @@
             <button class="filter-btn" data-type="LED" style="background:#5a3a3a">💡 LED</button>
             <button class="filter-btn" data-type="Label" style="background:#3a3a5a">🏷️ 标签</button>
             <button class="filter-btn reset" style="background:#888">⟳ 重置</button>
+            <button class="filter-btn close-filter" style="background:#aa6e3a">❌ 关闭过滤</button>
         </div>
         <div class="footer">点击控件查看详情</div>
         <div class="resize-handle" id="resizeHandle"></div>
@@ -269,7 +320,7 @@
             <button class="zoom-btn" id="zoomInBtn" title="放大">+</button>
             <button class="zoom-btn zoom-reset" id="zoomResetBtn" title="重置缩放">重置</button>
             <span class="zoom-level" id="zoomLevel">100%</span>
-            <button class="mag-btn" id="magBtn" title="鼠标放大镜 (悬浮显示控件详情)">🔍 放大镜</button>
+            <button class="mag-btn" id="magBtn" title="鼠标放大镜">🔍 放大镜</button>
         </div>
         <div id="status" class="status">等待导入 CSV 文件...</div>
         <div id="canvasWrapper" class="canvas-wrapper">
@@ -287,7 +338,7 @@
 </div>
 
 <script>
-    // ---------- 翻译字典 ----------
+    // ==================== 翻译字典 ====================
     const typeTranslation = {
         'DRO': '数字读数',
         'Image button': '图像按钮',
@@ -323,8 +374,6 @@
     const zoomStep = 0.05;
     const minZoom = 0.3;
     const maxZoom = 2.0;
-
-    // 放大镜状态
     let magnifierActive = false;
     let magTooltip = null;
 
@@ -332,7 +381,6 @@
     const DB_NAME = 'Mach3CSVHistory';
     const STORE_NAME = 'csvfiles';
     let db = null;
-
     function openDB() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, 1);
@@ -346,7 +394,6 @@
             };
         });
     }
-
     async function saveCSVToHistory(name, content) {
         await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -358,7 +405,6 @@
             request.onerror = () => reject(request.error);
         });
     }
-
     async function getAllHistory() {
         await openDB();
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -369,7 +415,6 @@
             request.onerror = () => reject(request.error);
         });
     }
-
     async function deleteHistoryById(id) {
         await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -380,7 +425,6 @@
             request.onerror = () => reject(request.error);
         });
     }
-
     async function clearAllHistory() {
         await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -391,7 +435,6 @@
             tx.onerror = () => reject(tx.error);
         });
     }
-
     async function refreshHistoryList() {
         const history = await getAllHistory();
         const container = document.getElementById('historyList');
@@ -509,9 +552,7 @@
         }
         return container;
     }
-
     function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]; }); }
-
     function showModal(ctrl, engFunc, chnFunc) {
         const modal = document.getElementById('modal');
         const title = document.getElementById('modalTitle');
@@ -528,7 +569,6 @@
         body.innerHTML = details;
         modal.style.display = 'flex';
     }
-
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     window.closeModal = closeModal;
 
@@ -554,7 +594,6 @@
         });
         switchToPage(sortedPages[0]);
     }
-
     function switchToPage(pageNum) {
         const container = document.getElementById('pageContainer');
         container.innerHTML = '';
@@ -564,8 +603,8 @@
         container.appendChild(pageCanvas);
         currentPage = pageNum;
         resetFilterDisplay();
+        if (magnifierActive) initMagnifier();
     }
-
     function resetFilterDisplay() {
         document.querySelectorAll('.ctrl-card').forEach(card => card.style.display = '');
     }
@@ -575,14 +614,23 @@
             card.style.display = cardType.includes(typeKeyword) ? '' : 'none';
         });
     }
-
     function bindFilterButtons() {
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            if (btn.classList.contains('reset')) {
-                btn.removeEventListener('click', resetFilterDisplay);
-                btn.addEventListener('click', resetFilterDisplay);
-            } else {
-                const type = btn.getAttribute('data-type');
+        // 重置按钮
+        const resetBtn = document.querySelector('.filter-btn.reset');
+        if (resetBtn) {
+            resetBtn.removeEventListener('click', resetFilterDisplay);
+            resetBtn.addEventListener('click', resetFilterDisplay);
+        }
+        // 新增关闭过滤按钮
+        const closeFilterBtn = document.querySelector('.filter-btn.close-filter');
+        if (closeFilterBtn) {
+            closeFilterBtn.removeEventListener('click', resetFilterDisplay);
+            closeFilterBtn.addEventListener('click', resetFilterDisplay);
+        }
+        // 其他类型按钮
+        document.querySelectorAll('.filter-btn:not(.reset):not(.close-filter)').forEach(btn => {
+            const type = btn.getAttribute('data-type');
+            if (type) {
                 btn.removeEventListener('click', () => filterByType(type));
                 btn.addEventListener('click', () => filterByType(type));
             }
@@ -599,7 +647,7 @@
     function zoomOut() { if (currentZoom - zoomStep >= minZoom) { currentZoom -= zoomStep; updateZoom(); } }
     function zoomReset() { currentZoom = 1.0; updateZoom(); }
 
-    // ---------- 放大镜功能 ----------
+    // ---------- 放大镜 ----------
     function initMagnifier() {
         if (!magnifierActive) return;
         const cards = document.querySelectorAll('.ctrl-card');
@@ -612,7 +660,6 @@
             card.addEventListener('mouseleave', magnifierLeave);
         });
     }
-
     function magnifierEnter(e) {
         if (!magnifierActive) return;
         const card = e.currentTarget;
@@ -636,24 +683,18 @@
         magTooltip.innerHTML = content;
         magTooltip.style.display = 'block';
     }
-
     function magnifierMove(e) {
         if (!magnifierActive || !magTooltip) return;
         let x = e.clientX + 15;
         let y = e.clientY + 15;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const tooltipRect = magTooltip.getBoundingClientRect();
-        if (x + tooltipRect.width > viewportWidth) x = e.clientX - tooltipRect.width - 10;
-        if (y + tooltipRect.height > viewportHeight) y = e.clientY - tooltipRect.height - 10;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const rect = magTooltip.getBoundingClientRect();
+        if (x + rect.width > vw) x = e.clientX - rect.width - 10;
+        if (y + rect.height > vh) y = e.clientY - rect.height - 10;
         magTooltip.style.left = x + 'px';
         magTooltip.style.top = y + 'px';
     }
-
-    function magnifierLeave() {
-        if (magTooltip) magTooltip.style.display = 'none';
-    }
-
+    function magnifierLeave() { if (magTooltip) magTooltip.style.display = 'none'; }
     function toggleMagnifier() {
         magnifierActive = !magnifierActive;
         const btn = document.getElementById('magBtn');
@@ -667,7 +708,6 @@
             btn.style.color = 'white';
             btn.innerHTML = '🔍 放大镜';
             if (magTooltip) magTooltip.style.display = 'none';
-            // 移除所有监听
             document.querySelectorAll('.ctrl-card').forEach(card => {
                 card.removeEventListener('mouseenter', magnifierEnter);
                 card.removeEventListener('mousemove', magnifierMove);
@@ -676,10 +716,11 @@
         }
     }
 
-    // ---------- 侧边栏宽度拖拽（范围 150px ~ 500px）----------
+    // ---------- 侧边栏拖拽 ----------
     function initResize() {
         const sidebar = document.getElementById('sidebar');
         const handle = document.getElementById('resizeHandle');
+        if (!handle) return;
         let startX, startWidth;
         function onMouseMove(e) {
             let newWidth = startWidth + (e.clientX - startX);
@@ -701,6 +742,26 @@
         });
     }
 
+    // ---------- 移动端菜单 ----------
+    function initMobileMenu() {
+        const menuBtn = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (!menuBtn) return;
+        function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('active'); }
+        function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('active'); }
+        menuBtn.addEventListener('click', () => {
+            if (sidebar.classList.contains('open')) closeSidebar();
+            else openSidebar();
+        });
+        overlay.addEventListener('click', closeSidebar);
+        sidebar.addEventListener('click', (e) => {
+            if (e.target.closest('.history-item') || e.target.closest('.tab-btn') || e.target.closest('.filter-btn')) {
+                if (window.innerWidth <= 768) closeSidebar();
+            }
+        });
+    }
+
     // ---------- CSV 加载 ----------
     async function loadCSV(file, saveToHistory = true) {
         const statusDiv = document.getElementById('status');
@@ -716,13 +777,7 @@
                 await refreshHistoryList();
             }
             zoomReset();
-            // 如果放大镜处于激活状态，需要重新绑定新生成的卡片
-            if (magnifierActive) {
-                // 重新绑定（先关闭再开启以刷新监听）
-                magnifierActive = false;
-                toggleMagnifier();
-                toggleMagnifier();
-            }
+            if (magnifierActive) { magnifierActive = false; toggleMagnifier(); toggleMagnifier(); }
         } catch (err) {
             statusDiv.innerText = `❌ 失败: ${err.message}`;
             console.error(err);
@@ -737,7 +792,6 @@
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
     const clearAllBtn = document.getElementById('clearAllHistoryBtn');
-
     uploadArea.addEventListener('click', () => fileInput.click());
     uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.background = '#2a2a2a'; });
     uploadArea.addEventListener('dragleave', () => { uploadArea.style.background = ''; });
@@ -752,7 +806,6 @@
         const file = e.target.files[0];
         if (file) await loadCSV(file);
     });
-
     clearAllBtn.addEventListener('click', async () => {
         if (confirm('清除所有历史 CSV 记录？')) {
             await clearAllHistory();
@@ -760,7 +813,6 @@
             document.getElementById('status').innerText = '已清除全部历史';
         }
     });
-
     document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
     document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
     document.getElementById('zoomResetBtn').addEventListener('click', zoomReset);
@@ -770,14 +822,13 @@
     (async () => {
         await refreshHistoryList();
         initResize();
+        initMobileMenu();
     })();
 
     // PWA Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-                console.log('SW registered', reg);
-            }).catch(err => console.log('SW failed', err));
+            navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered', reg)).catch(err => console.log('SW failed', err));
         });
     }
 </script>
