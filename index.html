@@ -9,90 +9,197 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
             background: #1e1e1e;
             color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .upload-area {
-            border: 2px dashed #ffaa66;
-            border-radius: 16px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            margin-bottom: 20px;
-            transition: background 0.2s;
-        }
-        .upload-area:hover { background: #2a2a2a; }
-        .file-info { margin-bottom: 20px; font-size: 14px; color: #aaa; }
-        .tabs {
+        .app { display: flex; height: 100vh; width: 100%; position: relative; }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 260px;
+            background: #252525;
+            border-right: 1px solid #444;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 20px;
-            background: #2a2a2a;
-            padding: 10px;
-            border-radius: 12px;
-        }
-        .tab-btn {
-            padding: 8px 16px;
-            background: #555;
-            border: none;
-            color: white;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: 0.2s;
-        }
-        .tab-btn.active { background: #ffaa66; color: #000; }
-        .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #2a2a2a;
-            border-radius: 12px;
-        }
-        .filter-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            color: white;
-            font-size: 14px;
-        }
-        .filter-btn.reset { background: #888; }
-        .page-canvas {
-            width: 1366px;
-            max-width: 100%;
-            height: auto;
-            min-height: 768px;
+            flex-direction: column;
+            padding: 12px 8px;
+            gap: 12px;
+            overflow-y: auto;
+            flex-shrink: 0;
             position: relative;
+        }
+        /* 拖拽把手 */
+        .resize-handle {
+            position: absolute;
+            right: -4px;
+            top: 0;
+            width: 8px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 10;
+        }
+        .resize-handle:hover { background: rgba(255, 170, 102, 0.3); }
+
+        /* 右侧主区 */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .toolbar {
+            background: #2a2a2a;
+            padding: 4px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            flex-shrink: 0;
+        }
+        .zoom-btn, .mag-btn {
+            background: #3a3a3a;
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mag-btn { width: auto; padding: 0 10px; font-size: 12px; font-weight: normal; gap: 4px; }
+        .zoom-btn:hover, .mag-btn:hover { background: #ffaa66; color: #000; }
+        .zoom-reset { background: #555; font-size: 12px; width: auto; padding: 0 10px; }
+        .zoom-level { font-size: 12px; margin-left: 8px; color: #ffaa66; }
+        .status {
+            background: #333;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-bottom: 1px solid #444;
+            flex-shrink: 0;
+        }
+        .canvas-wrapper {
+            flex: 1;
+            overflow: auto;
+            background: #1e1e1e;
+            padding: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .page-canvas {
+            position: relative;
+            width: 1366px;
+            height: 768px;
             background: #2b2b2b;
             border: 2px solid #ffaa66;
+            border-radius: 6px;
+            transform-origin: center center;
+            transition: transform 0.1s ease;
+        }
+        /* 放大镜浮层 */
+        .magnifier-tooltip {
+            position: fixed;
+            background: #1e1e1e;
+            border: 2px solid #ffaa66;
             border-radius: 8px;
-            margin-top: 10px;
-            overflow: auto;
-            transform: scale(0.8);
-            transform-origin: top left;
+            padding: 8px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 2000;
+            pointer-events: none;
+            font-family: monospace;
+            font-size: 14px;
+            max-width: 400px;
+            backdrop-filter: blur(4px);
+            background-color: rgba(30,30,30,0.95);
+            color: #ffaa66;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
-        @media (max-width: 1400px) {
-            .page-canvas { transform: scale(0.7); }
+        .magnifier-tooltip strong { color: #fff; }
+
+        /* 侧边栏内部样式 */
+        .upload-area {
+            border: 1px dashed #ffaa66;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 12px;
+            background: #1e1e1e;
         }
+        .upload-area:hover { background: #2a2a2a; }
+        .clear-all-btn {
+            background: #5a3a3a;
+            border: none;
+            border-radius: 6px;
+            padding: 6px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .section-title { font-size: 11px; color: #ffaa66; margin-bottom: 6px; margin-top: 8px; }
+        .history-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .history-item {
+            background: #2a2a2a;
+            border-radius: 4px;
+            padding: 4px 6px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .history-item:hover { background: #3a3a3a; }
+        .history-item-info { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .delete-history {
+            background: none;
+            border: none;
+            color: #ff8888;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+            margin-left: 6px;
+        }
+        .delete-history:hover { color: red; }
+        .tabs-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+        .tab-btn {
+            text-align: left;
+            padding: 5px 8px;
+            font-size: 12px;
+            background: #3a3a3a;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tab-btn.active { background: #ffaa66; color: #000; }
+        .filter-list { display: flex; flex-direction: column; gap: 6px; }
+        .filter-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+            text-align: center;
+        }
+        .filter-btn.reset { background: #888; }
         .ctrl-card {
             position: absolute;
             background: #3a6ea5;
             border: 1px solid #aaa;
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
             cursor: pointer;
             color: white;
-            font-size: 9px;
-            padding: 3px;
+            font-size: 10px;
+            padding: 2px 3px;
             box-sizing: border-box;
             opacity: 0.9;
             transition: 0.1s;
@@ -127,37 +234,50 @@
             max-height: 400px;
             overflow: auto;
         }
-        .close-btn {
-            float: right;
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
-        .status { margin: 10px 0; padding: 8px; background: #333; border-radius: 8px; }
+        .close-btn { float: right; background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; }
+        .footer { text-align: center; font-size: 10px; color: #888; margin-top: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
     </style>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<div class="container">
-    <div class="upload-area" id="uploadArea">
-        📂 点击或拖拽 CSV 文件到此处<br>
-        <small>支持分号/逗号分隔，自动编码识别</small>
+<div class="app">
+    <div class="sidebar" id="sidebar">
+        <div class="upload-area" id="uploadArea">📂 点击或拖拽 CSV 文件</div>
+        <button id="clearAllHistoryBtn" class="clear-all-btn">🗑️ 清除全部历史</button>
+        <div class="section-title">📜 历史 CSV</div>
+        <div id="historyList" class="history-list"></div>
+        <div class="section-title">📑 页面</div>
+        <div id="tabsList" class="tabs-list"></div>
+        <div class="section-title">🔍 过滤</div>
+        <div class="filter-list">
+            <button class="filter-btn" data-type="Image button" style="background:#3a6ea5">🔘 按钮</button>
+            <button class="filter-btn" data-type="DRO" style="background:#2a5a3a">📊 DRO</button>
+            <button class="filter-btn" data-type="LED" style="background:#5a3a3a">💡 LED</button>
+            <button class="filter-btn" data-type="Label" style="background:#3a3a5a">🏷️ 标签</button>
+            <button class="filter-btn reset" style="background:#888">⟳ 重置</button>
+        </div>
+        <div class="footer">点击控件查看详情</div>
+        <div class="resize-handle" id="resizeHandle"></div>
     </div>
-    <input type="file" id="fileInput" accept=".csv" style="display:none">
-    <div id="status" class="status">等待导入 CSV 文件...</div>
-    <div id="tabs" class="tabs" style="display:none"></div>
-    <div id="filterBar" class="filter-bar" style="display:none">
-        <button class="filter-btn" data-type="Image button" style="background:#3a6ea5">🔘 只显示按钮</button>
-        <button class="filter-btn" data-type="DRO" style="background:#2a5a3a">📊 只显示DRO</button>
-        <button class="filter-btn" data-type="LED" style="background:#5a3a3a">💡 只显示LED</button>
-        <button class="filter-btn" data-type="Label" style="background:#3a3a5a">🏷️ 只显示标签</button>
-        <button class="filter-btn reset" style="background:#888">🔁 重置显示</button>
+
+    <div class="main">
+        <div class="toolbar">
+            <button class="zoom-btn" id="zoomOutBtn" title="缩小">−</button>
+            <button class="zoom-btn" id="zoomInBtn" title="放大">+</button>
+            <button class="zoom-btn zoom-reset" id="zoomResetBtn" title="重置缩放">重置</button>
+            <span class="zoom-level" id="zoomLevel">100%</span>
+            <button class="mag-btn" id="magBtn" title="鼠标放大镜 (悬浮显示控件详情)">🔍 放大镜</button>
+        </div>
+        <div id="status" class="status">等待导入 CSV 文件...</div>
+        <div id="canvasWrapper" class="canvas-wrapper">
+            <div id="pageContainer"></div>
+        </div>
     </div>
-    <div id="pageContainer"></div>
 </div>
+
 <div id="modal" class="modal">
     <div class="modal-content">
         <button class="close-btn" onclick="closeModal()">&times;</button>
@@ -165,10 +285,9 @@
         <div class="modal-body" id="modalBody"></div>
     </div>
 </div>
-<div class="footer">⚙️ 点击控件查看详情 | 支持离线安装</div>
 
 <script>
-    // -------------------- 翻译字典 --------------------
+    // ---------- 翻译字典 ----------
     const typeTranslation = {
         'DRO': '数字读数',
         'Image button': '图像按钮',
@@ -198,17 +317,126 @@
     function translateType(eng) { return typeTranslation[eng] || eng; }
     function getBilingualName(eng, chn) { return (chn && chn !== eng) ? `${chn} (${eng})` : eng; }
 
-    let currentPages = {};      // { pageNum: [controls] }
+    let currentPages = {};
     let currentPage = null;
+    let currentZoom = 1.0;
+    const zoomStep = 0.05;
+    const minZoom = 0.3;
+    const maxZoom = 2.0;
 
-    // -------------------- CSV 解析 --------------------
+    // 放大镜状态
+    let magnifierActive = false;
+    let magTooltip = null;
+
+    // ---------- IndexedDB 历史管理 ----------
+    const DB_NAME = 'Mach3CSVHistory';
+    const STORE_NAME = 'csvfiles';
+    let db = null;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => { db = request.result; resolve(db); };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                }
+            };
+        });
+    }
+
+    async function saveCSVToHistory(name, content) {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const record = { name: name, content: content, timestamp: Date.now() };
+        const request = store.add(record);
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function getAllHistory() {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function deleteHistoryById(id) {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.delete(Number(id));
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function clearAllHistory() {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function refreshHistoryList() {
+        const history = await getAllHistory();
+        const container = document.getElementById('historyList');
+        container.innerHTML = '';
+        if (history.length === 0) {
+            container.innerHTML = '<div style="color:#aaa; font-size:11px; text-align:center;">暂无历史</div>';
+            return;
+        }
+        for (const item of history) {
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            div.title = `加载: ${item.name}`;
+            const info = document.createElement('span');
+            info.className = 'history-item-info';
+            info.textContent = `${item.name} (${new Date(item.timestamp).toLocaleString()})`;
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '✖';
+            delBtn.className = 'delete-history';
+            delBtn.title = '删除此记录';
+            delBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`删除历史记录：${item.name}？`)) {
+                    await deleteHistoryById(item.id);
+                    await refreshHistoryList();
+                }
+            });
+            div.appendChild(info);
+            div.appendChild(delBtn);
+            div.addEventListener('click', async () => {
+                const blob = new Blob([item.content], { type: 'text/csv' });
+                const file = new File([blob], item.name, { type: 'text/csv' });
+                await loadCSV(file, false);
+                document.getElementById('status').innerText = `✅ 加载历史: ${item.name}`;
+            });
+            container.appendChild(div);
+        }
+    }
+
+    // ---------- CSV 解析 ----------
     async function processCSV(file) {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
         if (!rows.length) throw new Error("CSV 为空");
-        // 第一行是列名
         const headers = rows[0].map(h => String(h || '').trim());
         const dataRows = rows.slice(1);
         const pages = {};
@@ -241,13 +469,11 @@
         return pages;
     }
 
-    // -------------------- 生成卡片HTML --------------------
+    // ---------- 生成画布 ----------
     function generatePageHTML(controls) {
         const container = document.createElement('div');
         container.className = 'page-canvas';
-        container.style.position = 'relative';
-        container.style.width = '1366px';
-        container.style.height = '768px';
+        container.style.transform = `scale(${currentZoom})`;
         for (const ctrl of controls) {
             const engFunc = ctrl.function;
             const chnFunc = funcTranslation[engFunc] || '';
@@ -273,8 +499,8 @@
             card.style.width = ctrl.width + 'px';
             card.style.height = ctrl.height + 'px';
             card.style.background = bgColor;
-            card.innerHTML = `<div style="font-weight:bold; word-break:break-word; font-size:9px;">${escapeHtml(displayName)}</div>
-                             <div style="font-size:7px; color:#ddd; margin-top:2px;">${cnType}</div>`;
+            card.innerHTML = `<div style="font-weight:bold; word-break:break-word; font-size:10px;">${escapeHtml(displayName)}</div>
+                             <div style="font-size:8px; color:#ddd; margin-top:2px;">${cnType}</div>`;
             card.addEventListener('click', (e) => {
                 e.stopPropagation();
                 showModal(ctrl, engFunc, chnFunc);
@@ -306,15 +532,13 @@
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     window.closeModal = closeModal;
 
-    // 渲染页面
+    // ---------- 页面渲染 ----------
     function renderPages(pages) {
         currentPages = pages;
         const sortedPages = Object.keys(pages).map(Number).sort((a,b)=>a-b);
         if (sortedPages.length === 0) return;
-        // 生成选项卡
-        const tabsDiv = document.getElementById('tabs');
-        tabsDiv.innerHTML = '';
-        tabsDiv.style.display = 'flex';
+        const tabsContainer = document.getElementById('tabsList');
+        tabsContainer.innerHTML = '';
         sortedPages.forEach((p, idx) => {
             const btn = document.createElement('button');
             btn.textContent = `页面 ${p}`;
@@ -322,16 +546,13 @@
             if (idx === 0) btn.classList.add('active');
             btn.dataset.page = p;
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#tabsList .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 switchToPage(p);
             });
-            tabsDiv.appendChild(btn);
+            tabsContainer.appendChild(btn);
         });
-        document.getElementById('filterBar').style.display = 'flex';
-        // 渲染第一个页面
-        const firstPage = sortedPages[0];
-        switchToPage(firstPage);
+        switchToPage(sortedPages[0]);
     }
 
     function switchToPage(pageNum) {
@@ -342,7 +563,6 @@
         const pageCanvas = generatePageHTML(controls);
         container.appendChild(pageCanvas);
         currentPage = pageNum;
-        // 重置过滤显示
         resetFilterDisplay();
     }
 
@@ -356,7 +576,6 @@
         });
     }
 
-    // 绑定过滤按钮事件
     function bindFilterButtons() {
         document.querySelectorAll('.filter-btn').forEach(btn => {
             if (btn.classList.contains('reset')) {
@@ -370,10 +589,154 @@
         });
     }
 
-    // 文件处理
+    // ---------- 缩放控制 ----------
+    function updateZoom() {
+        const canvas = document.querySelector('.page-canvas');
+        if (canvas) canvas.style.transform = `scale(${currentZoom})`;
+        document.getElementById('zoomLevel').innerText = `${Math.round(currentZoom * 100)}%`;
+    }
+    function zoomIn() { if (currentZoom + zoomStep <= maxZoom) { currentZoom += zoomStep; updateZoom(); } }
+    function zoomOut() { if (currentZoom - zoomStep >= minZoom) { currentZoom -= zoomStep; updateZoom(); } }
+    function zoomReset() { currentZoom = 1.0; updateZoom(); }
+
+    // ---------- 放大镜功能 ----------
+    function initMagnifier() {
+        if (!magnifierActive) return;
+        const cards = document.querySelectorAll('.ctrl-card');
+        cards.forEach(card => {
+            card.removeEventListener('mouseenter', magnifierEnter);
+            card.removeEventListener('mousemove', magnifierMove);
+            card.removeEventListener('mouseleave', magnifierLeave);
+            card.addEventListener('mouseenter', magnifierEnter);
+            card.addEventListener('mousemove', magnifierMove);
+            card.addEventListener('mouseleave', magnifierLeave);
+        });
+    }
+
+    function magnifierEnter(e) {
+        if (!magnifierActive) return;
+        const card = e.currentTarget;
+        const type = card.getAttribute('data-type');
+        const func = card.getAttribute('data-function');
+        const funcCn = card.getAttribute('data-function-cn');
+        const script = card.getAttribute('data-script');
+        let content = `<strong>${funcCn || func || '控件'}</strong><br>`;
+        content += `类型: ${card.getAttribute('data-type-cn') || type}<br>`;
+        if (funcCn && func) content += `功能: ${funcCn} (${func})<br>`;
+        else if (func) content += `功能: ${func}<br>`;
+        if (script && script.trim()) {
+            let shortScript = script.length > 80 ? script.substring(0, 80) + '…' : script;
+            content += `脚本: ${shortScript.replace(/\n/g, ' ')}`;
+        }
+        if (!magTooltip) {
+            magTooltip = document.createElement('div');
+            magTooltip.className = 'magnifier-tooltip';
+            document.body.appendChild(magTooltip);
+        }
+        magTooltip.innerHTML = content;
+        magTooltip.style.display = 'block';
+    }
+
+    function magnifierMove(e) {
+        if (!magnifierActive || !magTooltip) return;
+        let x = e.clientX + 15;
+        let y = e.clientY + 15;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const tooltipRect = magTooltip.getBoundingClientRect();
+        if (x + tooltipRect.width > viewportWidth) x = e.clientX - tooltipRect.width - 10;
+        if (y + tooltipRect.height > viewportHeight) y = e.clientY - tooltipRect.height - 10;
+        magTooltip.style.left = x + 'px';
+        magTooltip.style.top = y + 'px';
+    }
+
+    function magnifierLeave() {
+        if (magTooltip) magTooltip.style.display = 'none';
+    }
+
+    function toggleMagnifier() {
+        magnifierActive = !magnifierActive;
+        const btn = document.getElementById('magBtn');
+        if (magnifierActive) {
+            btn.style.background = '#ffaa66';
+            btn.style.color = '#000';
+            btn.innerHTML = '🔍 放大镜 (开)';
+            initMagnifier();
+        } else {
+            btn.style.background = '#3a3a3a';
+            btn.style.color = 'white';
+            btn.innerHTML = '🔍 放大镜';
+            if (magTooltip) magTooltip.style.display = 'none';
+            // 移除所有监听
+            document.querySelectorAll('.ctrl-card').forEach(card => {
+                card.removeEventListener('mouseenter', magnifierEnter);
+                card.removeEventListener('mousemove', magnifierMove);
+                card.removeEventListener('mouseleave', magnifierLeave);
+            });
+        }
+    }
+
+    // ---------- 侧边栏宽度拖拽（范围 150px ~ 500px）----------
+    function initResize() {
+        const sidebar = document.getElementById('sidebar');
+        const handle = document.getElementById('resizeHandle');
+        let startX, startWidth;
+        function onMouseMove(e) {
+            let newWidth = startWidth + (e.clientX - startX);
+            newWidth = Math.min(500, Math.max(150, newWidth));
+            sidebar.style.width = newWidth + 'px';
+        }
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.style.cursor = '';
+        }
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startWidth = sidebar.offsetWidth;
+            document.body.style.cursor = 'ew-resize';
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    // ---------- CSV 加载 ----------
+    async function loadCSV(file, saveToHistory = true) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = '⏳ 解析中 ...';
+        try {
+            const pages = await processCSV(file);
+            renderPages(pages);
+            bindFilterButtons();
+            statusDiv.innerText = `✅ 成功加载 ${Object.keys(pages).length} 个页面 | 横向滚动查看布局`;
+            if (saveToHistory) {
+                const content = await file.arrayBuffer();
+                await saveCSVToHistory(file.name, content);
+                await refreshHistoryList();
+            }
+            zoomReset();
+            // 如果放大镜处于激活状态，需要重新绑定新生成的卡片
+            if (magnifierActive) {
+                // 重新绑定（先关闭再开启以刷新监听）
+                magnifierActive = false;
+                toggleMagnifier();
+                toggleMagnifier();
+            }
+        } catch (err) {
+            statusDiv.innerText = `❌ 失败: ${err.message}`;
+            console.error(err);
+        }
+    }
+
+    // ---------- 事件绑定 ----------
     const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('fileInput');
-    const statusDiv = document.getElementById('status');
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    const clearAllBtn = document.getElementById('clearAllHistoryBtn');
 
     uploadArea.addEventListener('click', () => fileInput.click());
     uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.background = '#2a2a2a'; });
@@ -383,34 +746,38 @@
         uploadArea.style.background = '';
         const file = e.dataTransfer.files[0];
         if (file && file.name.endsWith('.csv')) await loadCSV(file);
-        else statusDiv.innerText = '❌ 请拖入 CSV 文件';
+        else document.getElementById('status').innerText = '❌ 请拖入 CSV 文件';
     });
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) await loadCSV(file);
     });
 
-    async function loadCSV(file) {
-        statusDiv.innerText = '⏳ 正在解析 CSV ...';
-        try {
-            const pages = await processCSV(file);
-            renderPages(pages);
-            bindFilterButtons();
-            statusDiv.innerText = `✅ 加载成功！共 ${Object.keys(pages).length} 个页面。可点击上方选项卡切换。`;
-        } catch (err) {
-            statusDiv.innerText = `❌ 解析失败: ${err.message}`;
-            console.error(err);
+    clearAllBtn.addEventListener('click', async () => {
+        if (confirm('清除所有历史 CSV 记录？')) {
+            await clearAllHistory();
+            await refreshHistoryList();
+            document.getElementById('status').innerText = '已清除全部历史';
         }
-    }
+    });
 
-    // PWA 注册 Service Worker
+    document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+    document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
+    document.getElementById('zoomResetBtn').addEventListener('click', zoomReset);
+    document.getElementById('magBtn').addEventListener('click', toggleMagnifier);
+
+    // 初始化
+    (async () => {
+        await refreshHistoryList();
+        initResize();
+    })();
+
+    // PWA Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').then(reg => {
-                console.log('Service Worker 注册成功', reg);
-            }).catch(err => {
-                console.log('Service Worker 注册失败', err);
-            });
+                console.log('SW registered', reg);
+            }).catch(err => console.log('SW failed', err));
         });
     }
 </script>
