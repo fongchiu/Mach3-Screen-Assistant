@@ -1,0 +1,21 @@
+{
+  "name": "Mach3 屏幕分析助手",
+  "short_name": "Mach3助手",
+  "description": "导入 CSV 文件，生成 Mach3 屏幕布局预览，支持离线使用",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1e1e1e",
+  "background_color": "#1e1e1e",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

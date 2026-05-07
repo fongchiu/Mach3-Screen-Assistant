@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mach3 屏幕分析助手 | PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .upload-area {
+            border: 2px dashed #ffaa66;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        .upload-area:hover { background: #2a2a2a; }
+        .file-info { margin-bottom: 20px; font-size: 14px; color: #aaa; }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 12px;
+        }
+        .tab-btn {
+            padding: 8px 16px;
+            background: #555;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+        .tab-btn.active { background: #ffaa66; color: #000; }
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #2a2a2a;
+            border-radius: 12px;
+        }
+        .filter-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            font-size: 14px;
+        }
+        .filter-btn.reset { background: #888; }
+        .page-canvas {
+            width: 1366px;
+            max-width: 100%;
+            height: auto;
+            min-height: 768px;
+            position: relative;
+            background: #2b2b2b;
+            border: 2px solid #ffaa66;
+            border-radius: 8px;
+            margin-top: 10px;
+            overflow: auto;
+            transform: scale(0.8);
+            transform-origin: top left;
+        }
+        @media (max-width: 1400px) {
+            .page-canvas { transform: scale(0.7); }
+        }
+        .ctrl-card {
+            position: absolute;
+            background: #3a6ea5;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            color: white;
+            font-size: 9px;
+            padding: 3px;
+            box-sizing: border-box;
+            opacity: 0.9;
+            transition: 0.1s;
+        }
+        .ctrl-card:hover { border: 2px solid #ffaa66; opacity: 1; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #2a2a2a;
+            width: 550px;
+            max-width: 85%;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 5px solid #ffaa66;
+        }
+        .modal-header { font-size: 20px; margin-bottom: 10px; color: #ffaa66; }
+        .modal-body {
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow: auto;
+        }
+        .close-btn {
+            float: right;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
+        .status { margin: 10px 0; padding: 8px; background: #333; border-radius: 8px; }
+    </style>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="upload-area" id="uploadArea">
+        📂 点击或拖拽 CSV 文件到此处<br>
+        <small>支持分号/逗号分隔，自动编码识别</small>
+    </div>
+    <input type="file" id="fileInput" accept=".csv" style="display:none">
+    <div id="status" class="status">等待导入 CSV 文件...</div>
+    <div id="tabs" class="tabs" style="display:none"></div>
+    <div id="filterBar" class="filter-bar" style="display:none">
+        <button class="filter-btn" data-type="Image button" style="background:#3a6ea5">🔘 只显示按钮</button>
+        <button class="filter-btn" data-type="DRO" style="background:#2a5a3a">📊 只显示DRO</button>
+        <button class="filter-btn" data-type="LED" style="background:#5a3a3a">💡 只显示LED</button>
+        <button class="filter-btn" data-type="Label" style="background:#3a3a5a">🏷️ 只显示标签</button>
+        <button class="filter-btn reset" style="background:#888">🔁 重置显示</button>
+    </div>
+    <div id="pageContainer"></div>
+</div>
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+        <div class="modal-header" id="modalTitle">控件信息</div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+<div class="footer">⚙️ 点击控件查看详情 | 支持离线安装</div>
+
+<script>
+    // -------------------- 翻译字典 --------------------
+    const typeTranslation = {
+        'DRO': '数字读数',
+        'Image button': '图像按钮',
+        'LED': '指示灯',
+        'Label': '标签',
+        'Image': '图像',
+        'G-Code': 'G代码',
+        'MDI': '手动输入',
+        'Toolpath': '刀具路径',
+        'Text': '文本',
+        'Skinned': '皮肤按钮',
+        'None': '无',
+    };
+    const funcTranslation = {
+        'Cycle start': '循环启动', 'Stop': '停止', 'Reset': '复位', 'Spindle CW': '主轴正转',
+        'Zero X': 'X轴清零', 'Zero Y': 'Y轴清零', 'Zero Z': 'Z轴清零', 'Zero A': 'A轴清零',
+        'Zero All': '全轴清零', 'Feedrate Override (FRO)': '进给倍率修调',
+        'X DRO': 'X轴坐标', 'Y DRO': 'Y轴坐标', 'Z DRO': 'Z轴坐标', 'A DRO': 'A轴坐标',
+        'X Machine Coord DRO': 'X机械坐标', 'Y Machine Coord DRO': 'Y机械坐标',
+        'Z Machine Coord DRO': 'Z机械坐标', 'A Machine Coord DRO': 'A机械坐标',
+        'Load G-code': '加载G代码', 'Edit G-code': '编辑G代码',
+        'Screen select page 1': '切换至页面1', 'Screen select page 2': '切换至页面2',
+        'Screen select page 3': '切换至页面3', 'Screen select page 4': '切换至页面4',
+        'Jog mode toggle': '点动模式切换', 'Goto Safe Z': '移动到安全Z',
+        'Reset LED': '复位指示灯', 'Start LED': '启动指示灯',
+    };
+    function translateType(eng) { return typeTranslation[eng] || eng; }
+    function getBilingualName(eng, chn) { return (chn && chn !== eng) ? `${chn} (${eng})` : eng; }
+
+    let currentPages = {};      // { pageNum: [controls] }
+    let currentPage = null;
+
+    // -------------------- CSV 解析 --------------------
+    async function processCSV(file) {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
+        if (!rows.length) throw new Error("CSV 为空");
+        // 第一行是列名
+        const headers = rows[0].map(h => String(h || '').trim());
+        const dataRows = rows.slice(1);
+        const pages = {};
+        for (const row of dataRows) {
+            const obj = {};
+            headers.forEach((h, idx) => { obj[h] = row[idx] ? String(row[idx]).trim() : ''; });
+            const pageStr = obj['Page'];
+            if (!pageStr || !/^\d+$/.test(pageStr)) continue;
+            const page = parseInt(pageStr, 10);
+            try {
+                const x = parseInt(parseFloat(obj['PosX1'] || 0));
+                const y = parseInt(parseFloat(obj['PosY1'] || 0));
+                const w = parseInt(parseFloat(obj['Width'] || 80));
+                const h = parseInt(parseFloat(obj['Height'] || 30));
+                const ctrl = {
+                    type: obj['Ctrl Type'] || '',
+                    function: obj['Ctrl Fct'] || '',
+                    text: (obj['Txt on Ctrl'] || '').replace(/""/g, '"'),
+                    img: obj['path image'] || '',
+                    x, y, width: w, height: h,
+                    oem: obj['OEMCode'] || '',
+                    format: obj['Format code'] || '',
+                };
+                if (!ctrl.type && !ctrl.function && !ctrl.text) continue;
+                if (!pages[page]) pages[page] = [];
+                pages[page].push(ctrl);
+            } catch(e) { console.warn("跳过行", e); }
+        }
+        if (Object.keys(pages).length === 0) throw new Error("未找到有效的页面数据");
+        return pages;
+    }
+
+    // -------------------- 生成卡片HTML --------------------
+    function generatePageHTML(controls) {
+        const container = document.createElement('div');
+        container.className = 'page-canvas';
+        container.style.position = 'relative';
+        container.style.width = '1366px';
+        container.style.height = '768px';
+        for (const ctrl of controls) {
+            const engFunc = ctrl.function;
+            const chnFunc = funcTranslation[engFunc] || '';
+            const displayName = getBilingualName(engFunc, chnFunc) || ctrl.text || ctrl.type;
+            const cnType = translateType(ctrl.type);
+            let bgColor = '#3a3a5a';
+            if (ctrl.type.includes('Image button')) bgColor = '#3a6ea5';
+            else if (ctrl.type.includes('DRO')) bgColor = '#2a5a3a';
+            else if (ctrl.type.includes('LED')) bgColor = '#5a3a3a';
+            const scriptEsc = (ctrl.text || '').replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+            const card = document.createElement('div');
+            card.className = 'ctrl-card';
+            card.setAttribute('data-type', ctrl.type);
+            card.setAttribute('data-function', engFunc);
+            card.setAttribute('data-script', scriptEsc);
+            card.setAttribute('data-img', ctrl.img);
+            card.setAttribute('data-oem', ctrl.oem);
+            card.setAttribute('data-format', ctrl.format);
+            card.setAttribute('data-type-cn', cnType);
+            card.setAttribute('data-function-cn', chnFunc);
+            card.style.left = ctrl.x + 'px';
+            card.style.top = ctrl.y + 'px';
+            card.style.width = ctrl.width + 'px';
+            card.style.height = ctrl.height + 'px';
+            card.style.background = bgColor;
+            card.innerHTML = `<div style="font-weight:bold; word-break:break-word; font-size:9px;">${escapeHtml(displayName)}</div>
+                             <div style="font-size:7px; color:#ddd; margin-top:2px;">${cnType}</div>`;
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showModal(ctrl, engFunc, chnFunc);
+            });
+            container.appendChild(card);
+        }
+        return container;
+    }
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]; }); }
+
+    function showModal(ctrl, engFunc, chnFunc) {
+        const modal = document.getElementById('modal');
+        const title = document.getElementById('modalTitle');
+        const body = document.getElementById('modalBody');
+        let details = `<b>类型:</b> ${translateType(ctrl.type)} (${ctrl.type})<br>`;
+        details += `<b>功能名称:</b> ${chnFunc || '无'}${chnFunc && chnFunc !== engFunc ? ` (${engFunc})` : ''}<br>`;
+        if (ctrl.text && ctrl.text.trim()) {
+            details += `<b>脚本/文本:</b> <pre style="background:#1e1e1e; padding:5px; border-radius:4px;">${escapeHtml(ctrl.text)}</pre>`;
+        }
+        if (ctrl.oem && ctrl.oem !== 'nan') details += `<b>OEM代码:</b> ${ctrl.oem}<br>`;
+        if (ctrl.format && ctrl.format !== 'nan') details += `<b>显示格式:</b> ${ctrl.format}<br>`;
+        if (ctrl.img && ctrl.img !== 'nan') details += `<b>图片:</b> ${ctrl.img}<br>`;
+        title.innerHTML = `📌 ${chnFunc || engFunc || '控件'} 详细信息`;
+        body.innerHTML = details;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    window.closeModal = closeModal;
+
+    // 渲染页面
+    function renderPages(pages) {
+        currentPages = pages;
+        const sortedPages = Object.keys(pages).map(Number).sort((a,b)=>a-b);
+        if (sortedPages.length === 0) return;
+        // 生成选项卡
+        const tabsDiv = document.getElementById('tabs');
+        tabsDiv.innerHTML = '';
+        tabsDiv.style.display = 'flex';
+        sortedPages.forEach((p, idx) => {
+            const btn = document.createElement('button');
+            btn.textContent = `页面 ${p}`;
+            btn.className = 'tab-btn';
+            if (idx === 0) btn.classList.add('active');
+            btn.dataset.page = p;
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                switchToPage(p);
+            });
+            tabsDiv.appendChild(btn);
+        });
+        document.getElementById('filterBar').style.display = 'flex';
+        // 渲染第一个页面
+        const firstPage = sortedPages[0];
+        switchToPage(firstPage);
+    }
+
+    function switchToPage(pageNum) {
+        const container = document.getElementById('pageContainer');
+        container.innerHTML = '';
+        const controls = currentPages[pageNum];
+        if (!controls) return;
+        const pageCanvas = generatePageHTML(controls);
+        container.appendChild(pageCanvas);
+        currentPage = pageNum;
+        // 重置过滤显示
+        resetFilterDisplay();
+    }
+
+    function resetFilterDisplay() {
+        document.querySelectorAll('.ctrl-card').forEach(card => card.style.display = '');
+    }
+    function filterByType(typeKeyword) {
+        document.querySelectorAll('.ctrl-card').forEach(card => {
+            const cardType = card.getAttribute('data-type') || '';
+            card.style.display = cardType.includes(typeKeyword) ? '' : 'none';
+        });
+    }
+
+    // 绑定过滤按钮事件
+    function bindFilterButtons() {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            if (btn.classList.contains('reset')) {
+                btn.removeEventListener('click', resetFilterDisplay);
+                btn.addEventListener('click', resetFilterDisplay);
+            } else {
+                const type = btn.getAttribute('data-type');
+                btn.removeEventListener('click', () => filterByType(type));
+                btn.addEventListener('click', () => filterByType(type));
+            }
+        });
+    }
+
+    // 文件处理
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const statusDiv = document.getElementById('status');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.background = '#2a2a2a'; });
+    uploadArea.addEventListener('dragleave', () => { uploadArea.style.background = ''; });
+    uploadArea.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        uploadArea.style.background = '';
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith('.csv')) await loadCSV(file);
+        else statusDiv.innerText = '❌ 请拖入 CSV 文件';
+    });
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) await loadCSV(file);
+    });
+
+    async function loadCSV(file) {
+        statusDiv.innerText = '⏳ 正在解析 CSV ...';
+        try {
+            const pages = await processCSV(file);
+            renderPages(pages);
+            bindFilterButtons();
+            statusDiv.innerText = `✅ 加载成功！共 ${Object.keys(pages).length} 个页面。可点击上方选项卡切换。`;
+        } catch (err) {
+            statusDiv.innerText = `❌ 解析失败: ${err.message}`;
+            console.error(err);
+        }
+    }
+
+    // PWA 注册 Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+                console.log('Service Worker 注册成功', reg);
+            }).catch(err => {
+                console.log('Service Worker 注册失败', err);
+            });
+        });
+    }
+</script>
+</body>
+</html>
